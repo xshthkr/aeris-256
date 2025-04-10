@@ -87,6 +87,9 @@ void feistel_net_decrypt(uint64_t* ciphertext, uint64_t* plaintext, uint8_t* mas
 }
 
 uint32_t f(uint32_t* half, uint64_t* round_key) {
-    return (*half ^ (uint32_t)(*round_key & 0xFFFFFFFF));
+    *half ^= (uint32_t)(*round_key & 0xFFFFFFFF);
+    *half = (*half << 3) | (*half >> (32 - 3));
+    *half = ~*half + 0x12345678;
+    return *half;
 }
 
