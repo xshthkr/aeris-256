@@ -1,77 +1,86 @@
 #include <cipher.h>
 #include <key_schedule.h>
-#include <utils.h>
 
-#include <string.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
-uint8_t* pad(uint8_t* buffer) {
-        int len = strlen((char*)buffer);
-        int pad_len = (BLOCK_SIZE / 8) - (len % (BLOCK_SIZE / 8));
+uint64_t* pad(uint8_t* input, int* length) {
 
-        if (pad_len == 0) {
-                pad_len = BLOCK_SIZE / 8;
-        } else {
-                pad_len = pad_len;
-        }
-        
-        uint8_t* padded_buffer = (uint8_t*)malloc(len + pad_len + 1);
-        memcpy(padded_buffer, buffer, len);
-        memset(padded_buffer + len, pad_len, pad_len);
-        padded_buffer[len + pad_len] = '\0';
-        return padded_buffer;
+        // calculate the block aligned length
+        if (*length % BLOCK_SIZE != 0) *length = (*length / BLOCK_SIZE + 1) * BLOCK_SIZE;
+        else *length = (*length / BLOCK_SIZE) * BLOCK_SIZE;
+
+        // malloc block aligned length to buffer
+        uint64_t* buffer_plaintext = (uint64_t*) malloc(*length / 8);
+
+        // memcpy the input to the buffer
+        memcpy((uint8_t*)buffer_plaintext, input, strlen((char*)input));
+        memset((uint8_t*)buffer_plaintext + strlen((char*)input), 'X', *length / 8 - strlen((char*)input));
+
+        return buffer_plaintext;
 }
 
-void encrypt(uint8_t* plaintext, uint8_t* ciphertext, uint8_t* key, int rounds, CipherMode mode) {
-        if (mode == FEISTEL_NETWORK) {
-                feistel_net(plaintext, ciphertext, key, rounds);
-        }
-        else {
-                return;
-        }
+void encrypt(uint64_t* plaintext, uint64_t* ciphertext, uint8_t* master_key, int* length) {
+
+        feistel_net_encrypt(plaintext, ciphertext, master_key, *length / BLOCK_SIZE);
+
 }
 
-void decrypt(uint8_t* ciphertext, uint8_t* plaintext, uint8_t* key, int rounds, CipherMode mode) {
-        if (mode == FEISTEL_NETWORK) {
-                feistel_net(ciphertext, plaintext, key, rounds);
-        }
-        else {
-                return;
-        }
+void decrypt(uint64_t* ciphertext, uint64_t* plaintext, uint8_t* master_key, int* length) {
+
+        feistel_net_decrypt(ciphertext, plaintext, master_key, *length / BLOCK_SIZE);
+
 }
 
-void feistel_net(uint8_t* plaintext, uint8_t* ciphertext, uint8_t* key, int rounds) {
 
-        uint64_t* round_keys = (uint64_t*)malloc(rounds * sizeof(uint64_t));
-        generate_round_keys(key, round_keys, rounds);
+void feistel_net_encrypt(uint64_t* plaintext, uint64_t* ciphertext, uint8_t* master_key, int num_blocks) {
 
-        // for block in message: encrypt using feistel network
-        for (size_t i = 0; i < strlen((char*)plaintext); i += BLOCK_SIZE / 8) {
-                uint64_t* block = (uint64_t*)(plaintext + i);
-                
-                uint32_t left = (uint32_t)(*block >> 32) & 0xFFFFFFFF;
-                uint32_t right = (uint32_t)(*block & 0xFFFFFFFF);
+        // generate round keys
+        uint64_t* round_keys = (uint64_t*) malloc(ROUNDS * sizeof(uint64_t));
+        generate_round_keys(master_key, round_keys);
 
+        // for each block in message: encrypt using feistel network
+        for (int i = 0; i < num_blocks; i++) {
+                uint32_t left = (uint32_t)(plaintext[i] >> 32) & 0xFFFFFFFF;
+                uint32_t right = (uint32_t)(plaintext[i] & 0xFFFFFFFF);
 
-                for (int j = 0; j < rounds; j++) {
+                for (int j = 0; j < ROUNDS; j++) {
                         uint32_t temp = right;
                         right = left ^ f(&right, &round_keys[j]);
                         left = temp;
                 }
 
-                uint64_t* encrypted_block = (uint64_t*)malloc(BLOCK_SIZE / 8);
-                *encrypted_block = ((uint64_t) right << 32) | left;
-
-                memcpy(ciphertext + i, encrypted_block, BLOCK_SIZE / 8);
-
-                free(encrypted_block);
+                ciphertext[i] = ((uint64_t)left << 32) | right;
         }
 
         free(round_keys);
-        
 }
 
+void feistel_net_decrypt(uint64_t* ciphertext, uint64_t* plaintext, uint8_t* master_key, int num_blocks) {
+
+        // generate round keys
+        uint64_t* round_keys = (uint64_t*) malloc(ROUNDS * sizeof(uint64_t));
+        generate_round_keys(master_key, round_keys);
+
+        // for each block in message: decrypt using feistel network
+        for (int i = 0; i < num_blocks; i++) {
+                uint32_t left = (uint32_t)(ciphertext[i] >> 32) & 0xFFFFFFFF;
+                uint32_t right = (uint32_t)(ciphertext[i] & 0xFFFFFFFF);
+
+                for (int j = ROUNDS - 1; j >= 0; j--) {
+                        uint32_t temp = left;
+                        left = right ^ f(&left, &round_keys[j]);
+                        right = temp;
+                }
+
+                plaintext[i] = ((uint64_t)left << 32) | right;
+        }
+
+        free(round_keys);
+}
 
 uint32_t f(uint32_t* half, uint64_t* round_key) {
-        return (*half ^ *round_key) + ((*half << 7) | (*half >> 25));
+    return (*half ^ (uint32_t)(*round_key & 0xFFFFFFFF));
 }
+
