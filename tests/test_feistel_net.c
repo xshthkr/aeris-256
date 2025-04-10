@@ -9,7 +9,7 @@
 
 int main () {
 
-        uint8_t* input = (uint8_t*) "Hello, World! This is a test string to chock the encryption and decryption process. It should be long enough to test the padding and unpadding functions. Let's see if it works correctly.";
+        uint8_t* input = (uint8_t*) "123";
         int input_length = strlen((char*)input);
         int length = strlen((char*)input) * 8;                  // in bits
 
@@ -33,14 +33,14 @@ int main () {
         assert(memcmp(buffer_plaintext_unpadded, input, input_length) == 0);
         printf("All tests passed.\n");
 
-        printf("Input: %s\n", (char*)input);
-        // print hex of ciphertext
-        printf("Ciphertext: ");
-        for (int i = 0; i < num_block * 8; i++) {
-                printf("%02x ", ((uint8_t*)buffer_ciphertext)[i]);
-        }
-        printf("\n");
-        printf("Decrypted: %s\n", (char*)buffer_plaintext_unpadded);
+        // printf("Input    : %s\n", (char*)input);
+        // printf("Plaintext: %s\n", (char*)buffer_plaintext);
+        // // printf("Ciphertext: ");
+        // // for (int i = 0; i < num_block * 8; i++) {
+        // //         printf("%02x ", ((uint8_t*)buffer_ciphertext)[i]);
+        // // }
+        // // printf("\n");
+        // printf("Decrypted: %s\n", (char*)buffer_plaintext_unpadded);
 
         free(buffer_plaintext);
         free(buffer_ciphertext);
