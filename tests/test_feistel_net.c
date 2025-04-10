@@ -26,9 +26,8 @@ int main () {
         uint64_t* buffer_decrypted = (uint64_t*) malloc(length / 8);
         decrypt(buffer_ciphertext, buffer_decrypted, master_key, &length);
 
-        uint8_t* buffer_plaintext_unpadded = (uint8_t*) malloc(input_length + 1);
-        memcpy(buffer_plaintext_unpadded, buffer_plaintext, input_length);
-        buffer_plaintext_unpadded[input_length] = '\0';
+        uint8_t* buffer_plaintext_unpadded = unpad(buffer_decrypted, length + 1);
+        buffer_plaintext_unpadded[length] = '\0';
 
         assert(memcmp(buffer_plaintext_unpadded, input, input_length) == 0);
         printf("All tests passed.\n");
