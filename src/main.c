@@ -7,133 +7,102 @@
 #include <stdint.h>
 #include <string.h>
 
-int main () {
+#define SALT "aeris256ciphersalt"
 
-        // store raw bytes of input.txt in a buffer
-        FILE *fp = fopen("input.txt", "rb");
-        if (fp == NULL) {
-                perror("Failed to open file");
-                return 1;
-        }
-        fseek(fp, 0, SEEK_END);
-        long file_size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
+int main (int argc, char* argv[]) {
 
-        uint8_t* buffer = malloc(file_size);
-        if (buffer == NULL) {
-                perror("Failed to allocate memory");
-                fclose(fp);
+        // ./cipher <input_file_path> <enc/dec> <password>
+
+        if (argc != 4) {
+                printf("Usage: %s <input_file_path> <enc/dec> <password>\n", argv[0]);
                 return 1;
         }
 
-        size_t bytes_read = fread(buffer, 1, file_size, fp);
-        if (bytes_read != (size_t)file_size) {
-                perror("Failed to read file");
-                free(buffer);
-                fclose(fp);
+        // read input file
+        FILE* input_file = fopen(argv[1], "rb");
+        if (input_file == NULL) {
+                printf("Error: Could not open input file.\n");
                 return 1;
         }
-        fclose(fp);
+        fseek(input_file, 0, SEEK_END);
+        long input_file_size = ftell(input_file);
+        fseek(input_file, 0, SEEK_SET);
 
-        int length = file_size * 8;
-        uint64_t* plaintext = pad(buffer, &length);
+        uint8_t* input = (uint8_t*) malloc(input_file_size);
+        if (input == NULL) {
+                printf("Error: Could not allocate memory for input.\n");
+                fclose(input_file);
+                return 1;
+        }
 
-        uint8_t* password = (uint8_t*) "password";
-        uint8_t* salt = (uint8_t*) "salt";
+        size_t bytes_read = fread(input, 1, input_file_size, input_file);
+        if (bytes_read != (size_t)input_file_size) {
+                printf("Error: Could not read input file.\n");
+                free(input);
+                fclose(input_file);
+                return 1;
+        }
+        fclose(input_file);
+
+        int input_length = bytes_read;
+        int length = input_length * 8;
+
+        uint64_t* buffer_plaintext = pad(input, &length);
+        int num_block = length / BLOCK_SIZE;
+
+        uint8_t* password = (uint8_t*) argv[3];
+        uint8_t* salt = (uint8_t*) SALT;
         uint8_t* master_key = generate_master_key(password, salt);
 
-        uint64_t* ciphertext = (uint64_t*) malloc(length / 8);
-        if (ciphertext == NULL) {
-                perror("Failed to allocate memory");
-                free(buffer);
-                free(plaintext);
-                free(master_key);
-                return 1;
+        if (strcmp(argv[2], "enc") == 0) {
+                uint64_t* buffer_ciphertext = (uint64_t*) malloc(sizeof(uint64_t) * num_block);
+                encrypt(buffer_plaintext, buffer_ciphertext, master_key, &length);
+
+                // write ciphertext to file
+                FILE* output_file = fopen("encrypted", "wb");
+                if (output_file == NULL) {
+                        printf("Error: Could not open output file.\n");
+                        free(buffer_plaintext);
+                        free(master_key);
+                        free(buffer_ciphertext);
+                        return 1;
+                }
+                fwrite(buffer_ciphertext, sizeof(uint64_t), num_block, output_file);
+                fclose(output_file);
+
+                printf("Encryption successful. Ciphertext written to ciphertext.bin\n");
+                free(buffer_ciphertext);
+                
+        } else if (strcmp(argv[2], "dec") == 0) {
+                uint64_t* buffer_decrypted = (uint64_t*) malloc(sizeof(uint64_t) * num_block);
+                decrypt((uint64_t*)input, buffer_decrypted, master_key, &length);
+
+                uint8_t* buffer_decrypted_unpadded = unpad(buffer_decrypted, input_length);
+
+                // write decrypted plaintext to file
+                FILE* output_file = fopen("decrypted", "wb");
+                if (output_file == NULL) {
+                        printf("Error: Could not open output file.\n");
+                        free(buffer_plaintext);
+                        free(master_key);
+                        free(buffer_decrypted);
+                        return 1;
+                }
+                fwrite(buffer_decrypted_unpadded, sizeof(uint64_t), num_block, output_file);
+                fclose(output_file);
+
+                printf("Decryption successful. Decrypted plaintext written to decrypted.txt\n");
+                free(buffer_decrypted_unpadded);
+                free(buffer_decrypted);
+                
+        } else {
+                printf("Error: Invalid operation. Use 'enc' for encryption or 'dec' for decryption.\n");
         }
 
-        encrypt(plaintext, ciphertext, master_key, &length);
-
-        // write encrypted data to encrypted.txt
-        FILE *fp_encrypted = fopen("encrypted.txt", "wb");
-        if (fp_encrypted == NULL) {
-                perror("Failed to open file");
-                free(buffer);
-                free(plaintext);
-                free(ciphertext);
-                free(master_key);
-                return 1;
-        }
-
-        size_t bytes_written = fwrite(ciphertext, 1, length / 8, fp_encrypted);
-        if (bytes_written != (size_t)length / 8) {
-                perror("Failed to write file");
-                free(buffer);
-                free(plaintext);
-                free(ciphertext);
-                free(master_key);
-                fclose(fp_encrypted);
-                return 1;
-        }
-
-        fclose(fp_encrypted);
-
-        uint64_t* decrypted = (uint64_t*) malloc(length / 8);
-        if (decrypted == NULL) {
-                perror("Failed to allocate memory");
-                free(buffer);
-                free(plaintext);
-                free(ciphertext);
-                free(master_key);
-                return 1;
-        }
-
-        decrypt(ciphertext, decrypted, master_key, &length);
-        uint8_t* unpadded_plaintext = (uint8_t*) malloc(file_size + 1);
-        if (unpadded_plaintext == NULL) {
-                perror("Failed to allocate memory");
-                free(buffer);
-                free(plaintext);
-                free(ciphertext);
-                free(master_key);
-                free(decrypted);
-                return 1;
-        }
-
-        memcpy(unpadded_plaintext, decrypted, file_size);
-
-        // write decrypted data to decrypted.txt
-        FILE *fp_decrypted = fopen("decrypted.txt", "wb");
-        if (fp_decrypted == NULL) {
-                perror("Failed to open file");
-                free(buffer);
-                free(plaintext);
-                free(ciphertext);
-                free(master_key);
-                free(decrypted);
-                free(unpadded_plaintext);
-                return 1;
-        }
-
-        size_t bytes_written_decrypted = fwrite(unpadded_plaintext, 1, file_size, fp_decrypted);
-        if (bytes_written_decrypted != (size_t)file_size) {
-                perror("Failed to write file");
-                free(buffer);
-                free(plaintext);
-                free(ciphertext);
-                free(master_key);
-                free(decrypted);
-                free(unpadded_plaintext);
-                fclose(fp_decrypted);
-                return 1;
-        }
-
-        fclose(fp_decrypted);
-        printf("Encryption and decryption completed successfully.\n");
-        free(buffer);
-        free(plaintext);
-        free(ciphertext);
+        free(buffer_plaintext);
         free(master_key);
-        free(decrypted);
-        free(unpadded_plaintext);
+        free(input);
+
         return 0;
+
 }
