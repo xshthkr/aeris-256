@@ -12,6 +12,14 @@ A lightweight block cipher inspired by AES and Simon-Speck ciphers
 - Mode of operation: ECB
 - Written in C with minimal dependencies (OpenSSL for SHA256)
 
+Encryption/decryption speeds:
+
+- 1MB: 0.006 seconds
+- 5MB: 0.028 seconds
+- 10MB: 0.03 seconds
+- 100MB: 0.5 seconds
+
+
 ## Installation and Usage
 
 Clone the repository and compile the source files
