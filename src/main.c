@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #define SALT "aeris256ciphersalt"
 
@@ -47,16 +48,21 @@ int main (int argc, char* argv[]) {
         int input_length = bytes_read;
         int length = input_length * 8;
 
-        uint64_t* buffer_plaintext = pad(input, &length);
-        int num_block = length / BLOCK_SIZE;
-
         uint8_t* password = (uint8_t*) argv[3];
         uint8_t* salt = (uint8_t*) SALT;
         uint8_t* master_key = generate_master_key(password, salt);
 
         if (strcmp(argv[2], "enc") == 0) {
+
+                uint64_t* buffer_plaintext = pad(input, &length);
+                int num_block = length / BLOCK_SIZE;
+
                 uint64_t* buffer_ciphertext = (uint64_t*) malloc(sizeof(uint64_t) * num_block);
+
+                clock_t start_time = clock();
                 encrypt(buffer_plaintext, buffer_ciphertext, master_key, &length);
+                clock_t end_time = clock();
+                double time_taken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
 
                 // write ciphertext to file
                 FILE* output_file = fopen("encrypted", "wb");
@@ -71,11 +77,23 @@ int main (int argc, char* argv[]) {
                 fclose(output_file);
 
                 printf("Encryption successful. Ciphertext written to ciphertext.bin\n");
+                printf("Time taken: %.5f seconds\n", time_taken);
                 free(buffer_ciphertext);
+                free(buffer_plaintext);
                 
         } else if (strcmp(argv[2], "dec") == 0) {
-                uint64_t* buffer_decrypted = (uint64_t*) malloc(sizeof(uint64_t) * num_block);
+                uint64_t* buffer_decrypted = (uint64_t*) malloc(sizeof(uint8_t) * input_length);
+                if (buffer_decrypted == NULL) {
+                        printf("Error: Could not allocate memory for decrypted buffer.\n");
+                        free(master_key);
+                        free(input);
+                        return 1;
+                }
+
+                clock_t start_time = clock();
                 decrypt((uint64_t*)input, buffer_decrypted, master_key, &length);
+                clock_t end_time = clock();
+                double time_taken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
 
                 uint8_t* buffer_decrypted_unpadded = unpad(buffer_decrypted, input_length);
 
@@ -83,15 +101,15 @@ int main (int argc, char* argv[]) {
                 FILE* output_file = fopen("decrypted", "wb");
                 if (output_file == NULL) {
                         printf("Error: Could not open output file.\n");
-                        free(buffer_plaintext);
                         free(master_key);
                         free(buffer_decrypted);
                         return 1;
                 }
-                fwrite(buffer_decrypted_unpadded, sizeof(uint64_t), num_block, output_file);
+                fwrite(buffer_decrypted_unpadded, sizeof(uint8_t), input_length, output_file);
                 fclose(output_file);
 
                 printf("Decryption successful. Decrypted plaintext written to decrypted.txt\n");
+                printf("Time taken: %.5f seconds\n", time_taken);
                 free(buffer_decrypted_unpadded);
                 free(buffer_decrypted);
                 
@@ -99,7 +117,6 @@ int main (int argc, char* argv[]) {
                 printf("Error: Invalid operation. Use 'enc' for encryption or 'dec' for decryption.\n");
         }
 
-        free(buffer_plaintext);
         free(master_key);
         free(input);
 
