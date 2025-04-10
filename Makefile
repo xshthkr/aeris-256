@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O2
+CFLAGS = -Wall -Wextra -Wpedantic -std=c99 -O2
 INCLUDE = -Iinclude
 LIB = -lssl -lcrypto
 
