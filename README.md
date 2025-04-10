@@ -9,7 +9,7 @@ A lightweight block cipher inspired by AES and Simon-Speck ciphers
 - Key size: 256 bits
 - Feistel Network
 - Keys derived from SHA256 hash of the password and salt
-- Mode of operation: ECB 
+- Mode of operation: ECB
 - Written in C with minimal dependencies (OpenSSL for SHA256)
 
 ## Installation and Usage
