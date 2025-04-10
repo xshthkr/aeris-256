@@ -21,6 +21,12 @@ uint64_t* pad(uint8_t* input, int* length) {
         return buffer_plaintext;
 }
 
+uint8_t* unpad(uint64_t* input, int length) {
+        uint8_t* unpadded_input = (uint8_t*) malloc(length);
+        memcpy(unpadded_input, input, length);
+        return unpadded_input;
+}
+
 void encrypt(uint64_t* plaintext, uint64_t* ciphertext, uint8_t* master_key, int* length) {
 
         feistel_net_encrypt(plaintext, ciphertext, master_key, *length / BLOCK_SIZE);

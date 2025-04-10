@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 uint64_t* pad(uint8_t* input, int* length);
+uint8_t* unpad(uint64_t* input, int length);
 
 void encrypt(uint64_t* plaintext, uint64_t* ciphertext, uint8_t* master_key, int* length);
 void decrypt(uint64_t* ciphertext, uint64_t* plaintext, uint8_t* master_key, int* length);
