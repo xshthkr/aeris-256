@@ -19,7 +19,6 @@ Encryption/decryption speeds:
 - 10MB: 0.03 seconds
 - 100MB: 0.5 seconds
 
-
 ## Installation and Usage
 
 Clone the repository and compile the source files
